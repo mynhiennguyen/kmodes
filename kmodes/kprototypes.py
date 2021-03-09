@@ -180,6 +180,9 @@ class KPrototypes(kmodes.KModes):
         -------
         labels : array, shape [n_samples,]
             Index of the cluster each sample belongs to.
+        cost : int, total distances of data points to their clusters centroid
+        min_distance: array, shape [n_samples,]
+            Distance to assigned clusters centroid for each sample
         """
         assert hasattr(self, '_enc_cluster_centroids'), "Model not yet fitted."
 
@@ -194,7 +197,7 @@ class KPrototypes(kmodes.KModes):
         Xnum, Xcat = check_array(Xnum), check_array(Xcat, dtype=None)
         Xcat, _ = encode_features(Xcat, enc_map=self._enc_map)
         return labels_cost(Xnum, Xcat, self._enc_cluster_centroids,
-                           self.num_dissim, self.cat_dissim, self.gamma)[0]
+                           self.num_dissim, self.cat_dissim, self.gamma)
 
     @property
     def cluster_centroids_(self):
@@ -218,6 +221,7 @@ def labels_cost(Xnum, Xcat, centroids, num_dissim, cat_dissim, gamma, membship=N
 
     cost = 0.
     labels = np.empty(n_points, dtype=np.uint16)
+    min_distance = np.empty(n_points, dtype=float)
     for ipoint in range(n_points):
         # Numerical cost = sum of Euclidean distances
         num_costs = num_dissim(centroids[0], Xnum[ipoint])
@@ -227,8 +231,9 @@ def labels_cost(Xnum, Xcat, centroids, num_dissim, cat_dissim, gamma, membship=N
         clust = np.argmin(tot_costs)
         labels[ipoint] = clust
         cost += tot_costs[clust]
+        min_distance[ipoint] = tot_costs[clust]
 
-    return labels, cost
+    return labels, cost, min_distance
 
 
 def k_prototypes(X, categorical, n_clusters, max_iter, num_dissim, cat_dissim,
@@ -412,7 +417,7 @@ def _k_prototypes_single(Xnum, Xcat, nnumattrs, ncatattrs, n_clusters, n_points,
     labels = None
     converged = False
 
-    _, cost = labels_cost(Xnum, Xcat, centroids,
+    _, cost, _ = labels_cost(Xnum, Xcat, centroids,
                           num_dissim, cat_dissim, gamma, membship)
 
     epoch_costs = [cost]
@@ -424,7 +429,7 @@ def _k_prototypes_single(Xnum, Xcat, nnumattrs, ncatattrs, n_clusters, n_points,
                                               random_state)
 
         # All points seen in this iteration
-        labels, ncost = labels_cost(Xnum, Xcat, centroids,
+        labels, ncost, _ = labels_cost(Xnum, Xcat, centroids,
                                     num_dissim, cat_dissim, gamma, membship)
         converged = (moves == 0) or (ncost >= cost)
         epoch_costs.append(ncost)
