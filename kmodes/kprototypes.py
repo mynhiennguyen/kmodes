@@ -183,6 +183,8 @@ class KPrototypes(kmodes.KModes):
         cost : int, total distances of data points to their clusters centroid
         min_distance: array, shape [n_samples,]
             Distance to assigned clusters centroid for each sample
+        tot_distances: array, shape [n_samples, n_clusters]
+            Distances for each sample to each cluster
         """
         assert hasattr(self, '_enc_cluster_centroids'), "Model not yet fitted."
 
@@ -222,6 +224,7 @@ def labels_cost(Xnum, Xcat, centroids, num_dissim, cat_dissim, gamma, membship=N
     cost = 0.
     labels = np.empty(n_points, dtype=np.uint16)
     min_distance = np.empty(n_points, dtype=float)
+    tot_distances = np.empty(shape=(n_points, centroids[0].shape[0]), dtype=float)
     for ipoint in range(n_points):
         # Numerical cost = sum of Euclidean distances
         num_costs = num_dissim(centroids[0], Xnum[ipoint])
@@ -232,8 +235,9 @@ def labels_cost(Xnum, Xcat, centroids, num_dissim, cat_dissim, gamma, membship=N
         labels[ipoint] = clust
         cost += tot_costs[clust]
         min_distance[ipoint] = tot_costs[clust]
+        tot_distances[ipoint] = tot_costs
 
-    return labels, cost, min_distance
+    return labels, cost, min_distance, tot_distances
 
 
 def k_prototypes(X, categorical, n_clusters, max_iter, num_dissim, cat_dissim,
@@ -417,7 +421,7 @@ def _k_prototypes_single(Xnum, Xcat, nnumattrs, ncatattrs, n_clusters, n_points,
     labels = None
     converged = False
 
-    _, cost, _ = labels_cost(Xnum, Xcat, centroids,
+    _, cost, _, _ = labels_cost(Xnum, Xcat, centroids,
                           num_dissim, cat_dissim, gamma, membship)
 
     epoch_costs = [cost]
@@ -429,7 +433,7 @@ def _k_prototypes_single(Xnum, Xcat, nnumattrs, ncatattrs, n_clusters, n_points,
                                               random_state)
 
         # All points seen in this iteration
-        labels, ncost, _ = labels_cost(Xnum, Xcat, centroids,
+        labels, ncost, _, _ = labels_cost(Xnum, Xcat, centroids,
                                     num_dissim, cat_dissim, gamma, membship)
         converged = (moves == 0) or (ncost >= cost)
         epoch_costs.append(ncost)
@@ -519,3 +523,4 @@ def _split_num_cat(X, categorical):
                                if ii not in categorical]]).astype(np.float64)
     Xcat = np.asanyarray(X[:, categorical])
     return Xnum, Xcat
+
